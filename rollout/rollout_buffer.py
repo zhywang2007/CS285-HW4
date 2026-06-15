@@ -49,4 +49,50 @@ def iter_minibatches(
     # - Slice ALL tensor fields consistently with the same minibatch indices.
     # - Keep task_names / completion_texts aligned with the same indices when present.
     # - If device is not None, move the minibatch to that device before yielding.
-    raise NotImplementedError("student TODO: iter_minibatches")
+    N = batch.input_ids.shape[0]
+    if shuffle==True:
+        indices = torch.randperm(N, generator=generator).tolist()
+    else:
+        indices = list(range(N))
+    
+    for start in range(0, N, minibatch_size):
+        end = min(start + minibatch_size, N)
+        mb_indices = indices[start:end]
+        
+        # 切片张量字段
+        mb_input_ids = batch.input_ids[mb_indices]
+        mb_attention_mask = batch.attention_mask[mb_indices]
+        mb_completion_mask = batch.completion_mask[mb_indices]
+        mb_old_logprobs = batch.old_logprobs[mb_indices]
+        mb_ref_logprobs = batch.ref_logprobs[mb_indices]
+        mb_rewards = batch.rewards[mb_indices]
+        mb_advantages = batch.advantages[mb_indices]
+        
+        # 切片列表字段
+        mb_task_names = [batch.task_names[i] for i in mb_indices]
+        mb_completion_texts = [batch.completion_texts[i] for i in mb_indices]
+        
+        # 移动到指定设备（如果提供）
+        if device is not None:
+            mb_input_ids = mb_input_ids.to(device)
+            mb_attention_mask = mb_attention_mask.to(device)
+            mb_completion_mask = mb_completion_mask.to(device)
+            mb_old_logprobs = mb_old_logprobs.to(device)
+            mb_ref_logprobs = mb_ref_logprobs.to(device)
+            mb_rewards = mb_rewards.to(device)
+            mb_advantages = mb_advantages.to(device)
+        
+        # 创建新的 RolloutBatch 并 yield
+        yield RolloutBatch(
+            input_ids=mb_input_ids,
+            attention_mask=mb_attention_mask,
+            completion_mask=mb_completion_mask,
+            old_logprobs=mb_old_logprobs,
+            ref_logprobs=mb_ref_logprobs,
+            rewards=mb_rewards,
+            advantages=mb_advantages,
+            task_names=mb_task_names,
+            completion_texts=mb_completion_texts,
+        )
+    
+        

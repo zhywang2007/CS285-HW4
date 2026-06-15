@@ -189,7 +189,12 @@ def compute_group_advantages(rewards: torch.Tensor, group_size: int, eps: float 
     # IMPORTANT SHAPE CONVENTION:
     # reshape to [num_groups, group_size] (NOT [group_size, num_groups]) before
     # normalizing within each prompt's group.
-    #
+    N=rewards.shape[0]
+    rewards=rewards.reshape((int(N/group_size),group_size))
+    A_mean=rewards.mean(dim=-1).unsqueeze(-1)
+    std=rewards.std(dim=-1,unbiased=False)
+    A=(rewards-A_mean)/((std+torch.tensor([eps])).unsqueeze(-1))
+    return A.flatten()
     # For each group g and candidate i:
     #   A_{g,i} = (r_{g,i} - mean(r_g)) / (std(r_g) + eps)
     # Use the population standard deviation within each group (PyTorch:
@@ -202,8 +207,7 @@ def compute_group_advantages(rewards: torch.Tensor, group_size: int, eps: float 
     #   of your choice for that group
     #
     # Return a flat tensor with the same shape/order as rewards.
-    raise NotImplementedError("student TODO: compute_group_advantages")
-
+    
 
 def maybe_normalize_advantages(advantages: torch.Tensor, enabled: bool, eps: float = 1e-6) -> torch.Tensor:
     # TODO(student): if enabled, z-score normalize the full advantage vector:
@@ -211,8 +215,11 @@ def maybe_normalize_advantages(advantages: torch.Tensor, enabled: bool, eps: flo
     # Again use the population standard deviation (unbiased=False).
     # Otherwise return A unchanged.
     # Keep the output shape identical to the input shape.
-    raise NotImplementedError("student TODO: maybe_normalize_advantages")
-
+    if enabled:
+        mean=advantages.mean()
+        std=advantages.std(unbiased=False)
+        advantages=(advantages-mean)/(std+torch.tensor(eps))
+    return advantages
 
 def maybe_update_warmup_lr(optimizer: torch.optim.Optimizer, base_lr: float, step: int, warmup_steps: int) -> None:
     if warmup_steps <= 0:
